@@ -96,8 +96,7 @@ workflows:
   build-and-test:
     jobs:
       - test-java:
-          parameters:
-            java-version: "17"
+          java-version: "17"
       - benchmark-jmh-docker:
           matrix:
             parameters:

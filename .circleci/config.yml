@@ -2,14 +2,16 @@
 # Stacks detected: deps:java:.,tool:gradle:
 version: 2.1
 
+# Parameters section for reusable values
 parameters:
   java-version:
     type: string
-    default: "17"
+    default: "17"  # Default java version used for test-java
   os-type:
     type: string
-    default: "ubuntu"
+    default: "ubuntu"  # Default OS for benchmark jobs
 
+# Define the executor for Java jobs with dynamic java version
 executors:
   docker-java:
     parameters:
@@ -28,6 +30,7 @@ executors:
     macos:
       xcode: "14.3.1"
 
+# Define the jobs for testing and benchmarking
 jobs:
   test-java:
     parameters:
@@ -92,15 +95,16 @@ jobs:
       - store_artifacts:
           path: build/reports
 
+# Define the workflow
 workflows:
   build-and-test:
     jobs:
       - test-java:
-          java-version: "17"
+          java-version: "17"  # Explicitly provide java-version for test-java job
       - benchmark-jmh-docker:
           matrix:
             parameters:
-              java-version: ["8", "11", "17", "21"]
+              java-version: ["8", "11", "17", "21"]  # Running benchmarks with multiple Java versions
               os-type: ["docker-java"]
       - benchmark-jmh-windows:
           matrix:

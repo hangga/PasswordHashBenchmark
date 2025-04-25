@@ -128,7 +128,6 @@ public class PasswordValidationTest {
     @Test
     public void givenRawPasswordAndSalt_whenArgon2AlgorithmIsUsed_thenHashIsCorrect() {
         byte[] salt = generateSalt16Byte();
-        String password = "Baeldung";
 
         int iterations = 2;
         int memLimit = 66536;

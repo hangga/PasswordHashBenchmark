@@ -33,17 +33,9 @@ jobs:
     parameters:
       java-version:
         type: string
-      os-type:
-        type: string
-    executor:
-      <<: *executor-selector
+    executor: docker-java
     steps:
       - checkout
-      - run:
-          name: Set up Java (for Windows/macOS)
-          when: on_fail
-          command: |
-            echo "Java setup required for non-Docker OS"
       - run:
           name: Calculate cache key
           command: |
@@ -61,11 +53,63 @@ jobs:
       - store_artifacts:
           path: build/reports
 
+  benchmark-jmh-docker:
+    parameters:
+      java-version:
+        type: string
+    executor: docker-java
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
+  benchmark-jmh-windows:
+    parameters:
+      java-version:
+        type: string
+    executor: windows
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark on Windows
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
+  benchmark-jmh-macos:
+    parameters:
+      java-version:
+        type: string
+    executor: macos
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark on macOS
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
 workflows:
   build-and-test:
     jobs:
       - test-java:
+          parameters:
+            java-version: "17"
+      - benchmark-jmh-docker:
           matrix:
             parameters:
               java-version: ["8", "11", "17", "21"]
-              os-type: ["docker-java", "windows", "macos"]
+              os-type: ["docker-java"]
+      - benchmark-jmh-windows:
+          matrix:
+            parameters:
+              java-version: ["8", "11", "17", "21"]
+              os-type: ["windows"]
+      - benchmark-jmh-macos:
+          matrix:
+            parameters:
+              java-version: ["8", "11", "17", "21"]
+              os-type: ["macos"]

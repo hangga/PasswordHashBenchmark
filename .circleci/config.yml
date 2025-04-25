@@ -47,7 +47,8 @@ jobs:
 
   benchmark-jmh-macos:
     macos:
-      xcode: "12.5.0"
+      resource_class: macos.medium  # Resource class yang valid
+      xcode: "12.5.0"               # Versi Xcode yang tersedia
     steps:
       - checkout
       - run:
@@ -56,17 +57,6 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-#  benchmark-jmh-windows:
-#    windows:
-#      version: "20H2"
-#    steps:
-#      - checkout
-#      - run:
-#          name: Run JMH Benchmark on Windows
-#          command: ./gradlew jmh
-#      - store_artifacts:
-#          path: build/reports
-
 workflows:
   build-and-test:
     jobs:
@@ -74,4 +64,3 @@ workflows:
       - benchmark-jmh
       - benchmark-jmh-ubuntu
       - benchmark-jmh-macos
-#      - benchmark-jmh-windows

@@ -41,23 +41,6 @@ workflows:
       - test-java
       - benchmark-jmh:
           matrix:
-            java_version:
-              - "8"
-              - "9"
-              - "10"
-              - "11"
-              - "12"
-              - "13"
-              - "14"
-              - "15"
-              - "16"
-              - "17"
-              - "18"
-              - "19"
-              - "20"
-              - "21"
-              - "22"
-            os:
-              - "ubuntu"
-              - "windows"
-              - "macos"
+            parameters:
+              java_version: ["8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"]
+              os: ["ubuntu", "windows", "macos"]

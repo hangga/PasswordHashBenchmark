@@ -25,7 +25,7 @@ jobs:
 
   benchmark-jmh:
     docker:
-      - image: cimg/openjdk:{{ .java_version }}
+      - image: cimg/openjdk:17.0
     steps:
       - checkout
       - run:
@@ -34,12 +34,44 @@ jobs:
       - store_artifacts:
           path: build/reports
 
+  benchmark-jmh-ubuntu:
+    docker:
+      - image: cimg/openjdk:17.0
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark on Ubuntu
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
+  benchmark-jmh-macos:
+    macos:
+      xcode: "12.5.0"
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark on macOS
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
+  benchmark-jmh-windows:
+    windows:
+      version: "20H2"
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark on Windows
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
 workflows:
-  version: 2
   build-and-test:
     jobs:
       - test-java
-      - benchmark-jmh:
-          matrix:
-            parameters:
-              java_version: ["8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"]
+      - benchmark-jmh
+      - benchmark-jmh-ubuntu
+      - benchmark-jmh-macos
+      - benchmark-jmh-windows

@@ -56,16 +56,16 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh-windows:
-    windows:
-      version: "20H2"
-    steps:
-      - checkout
-      - run:
-          name: Run JMH Benchmark on Windows
-          command: ./gradlew jmh
-      - store_artifacts:
-          path: build/reports
+#  benchmark-jmh-windows:
+#    windows:
+#      version: "20H2"
+#    steps:
+#      - checkout
+#      - run:
+#          name: Run JMH Benchmark on Windows
+#          command: ./gradlew jmh
+#      - store_artifacts:
+#          path: build/reports
 
 workflows:
   build-and-test:
@@ -74,4 +74,4 @@ workflows:
       - benchmark-jmh
       - benchmark-jmh-ubuntu
       - benchmark-jmh-macos
-      - benchmark-jmh-windows
+#      - benchmark-jmh-windows

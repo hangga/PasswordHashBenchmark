@@ -1,21 +1,51 @@
 # This config was automatically generated from your source code
 # Stacks detected: deps:java:.,tool:gradle:
 version: 2.1
+
+executors:
+  docker-java:
+    parameters:
+      java-version:
+        type: string
+    docker:
+      - image: cimg/openjdk:<<parameters.java-version>>
+    working_directory: ~/project
+
+  windows:
+    machine:
+      image: windows-server-2022-gui
+    shell: powershell.exe
+
+  macos-intel:
+    macos:
+      xcode: "14.3.1"
+    resource_class: macos.x86.medium.gen2
+
+  macos-m1:
+    macos:
+      xcode: "14.3.1"
+    resource_class: macos.m1.medium.gen1
+
 jobs:
   test-java:
-    docker:
-      - image: cimg/openjdk:17.0
+    parameters:
+      java-version:
+        type: string
+      os-type:
+        type: string
+    executor:
+      name: <<parameters.os-type>>
+      java-version: <<parameters.java-version>>
     steps:
       - checkout
       - run:
           name: Calculate cache key
-          command: |-
+          command: |
             find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+              sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
-      - run:
-          command: ./gradlew check
+      - run: ./gradlew check
       - store_test_results:
           path: build/test-results
       - save_cache:
@@ -24,19 +54,14 @@ jobs:
             - ~/.gradle/caches
       - store_artifacts:
           path: build/reports
-  benchmark-jmh:
-    docker:
-      - image: cimg/openjdk:17.0
-    steps:
-      - checkout
-      - run:
-          name: Run JMH Benchmark
-          command: ./gradlew jmh
-      - store_artifacts:
-          path: build/reports
 
 workflows:
   build-and-test:
     jobs:
-      - test-java
-      - benchmark-jmh
+      - test-java:
+          matrix:
+            parameters:
+              java-version: ["8", "11", "17", "21"]
+              os-type: ["docker-java", "windows", "macos-intel", "macos-m1"]
+
+

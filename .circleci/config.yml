@@ -2,93 +2,70 @@
 # Stacks detected: deps:java:.,tool:gradle:
 version: 2.1
 
-jobs:
-  # Job test standar (tetap sederhana)
-  test-java:
-    docker:
-      - image: cimg/openjdk:17.0  # Ubuntu LTS dengan Java 17
-    steps:
-      - checkout
-      - run:
-          name: Run tests
-          command: ./gradlew check
-      - store_test_results:
-          path: build/test-results
-      - store_artifacts:
-          path: build/reports
+parameters:
+  java-version:
+    type: string
+    default: "17"
+  os-type:
+    type: string
+    default: "ubuntu"
 
-  # Job benchmark dengan matriks OS + Java
-  benchmark-jmh:
+executors:
+  docker-java:
     parameters:
       java-version:
         type: string
-      os-image:
-        type: string
-      os-name:
-        type: string  # Label untuk tampilan UI
     docker:
-      - image: << parameters.os-image >>
+      - image: cimg/openjdk:<<parameters.java-version>>
+    working_directory: ~/project
+
+  windows:
+    machine:
+      image: windows-server-2022-gui
+    shell: powershell.exe
+
+  macos:
+    macos:
+      xcode: "14.3.1"
+
+jobs:
+  test-java:
+    parameters:
+      java-version:
+        type: string
+      os-type:
+        type: string
+    executor:
+      <<: *executor-selector
     steps:
       - checkout
       - run:
-          name: Setup Java << parameters.java-version >> on << parameters.os-name >>
+          name: Set up Java (for Windows/macOS)
+          when: on_fail
           command: |
-            # Skip instalasi jika image sudah menyediakan Java versi yang benar
-            if ! java -version 2>&1 | grep -q "version \"<< parameters.java-version >>"; then
-              echo "Installing Java << parameters.java-version >>..."
-              sudo apt-get update
-              sudo apt-get install -y wget
-              wget -O openjdk.tar.gz https://download.java.net/java/GA/jdk<< parameters.java-version >>/GPL/openjdk-<< parameters.java-version >>_linux-x64_bin.tar.gz
-              sudo mkdir -p /usr/lib/jvm
-              sudo tar xzf openjdk.tar.gz -C /usr/lib/jvm
-              export JAVA_HOME="/usr/lib/jvm/jdk-<< parameters.java-version >>"
-              export PATH="$JAVA_HOME/bin:$PATH"
-            fi
+            echo "Java setup required for non-Docker OS"
       - run:
-          name: Run JMH Benchmark
-          command: ./gradlew jmh
+          name: Calculate cache key
+          command: |
+            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
+              sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+      - restore_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+      - run: ./gradlew check
+      - store_test_results:
+          path: build/test-results
+      - save_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          paths:
+            - ~/.gradle/caches
       - store_artifacts:
-          path: build/reports/jmh
-          destination: jmh-report-<< parameters.os-name >>-jdk<< parameters.java-version >>
+          path: build/reports
 
 workflows:
-  version: 2
   build-and-test:
     jobs:
-      - test-java
-      # Ubuntu + Multi Java Version
-      - benchmark-jmh:
-          name: "Benchmark - Ubuntu (JDK 11)"
-          java-version: "11"
-          os-image: "cimg/base:2024.01-ubuntu"
-          os-name: "ubuntu"
-          requires: [test-java]
-      - benchmark-jmh:
-          name: "Benchmark - Ubuntu (JDK 17)"
-          java-version: "17"
-          os-image: "cimg/openjdk:17.0"  # Image khusus Java 17
-          os-name: "ubuntu"
-          requires: [test-java]
-      - benchmark-jmh:
-          name: "Benchmark - Ubuntu (JDK 21)"
-          java-version: "21"
-          os-image: "cimg/base:2024.01-ubuntu"
-          os-name: "ubuntu"
-          requires: [test-java]
-
-      # Debian
-      - benchmark-jmh:
-          name: "Benchmark - Debian (JDK 17)"
-          java-version: "17"
-          os-image: "cimg/base:2024.01-debian"
-          os-name: "debian"
-          requires: [test-java]
-
-      # Alpine (Lightweight)
-      - benchmark-jmh:
-          name: "Benchmark - Alpine (JDK 17)"
-          java-version: "17"
-          os-image: "alpine:3.19"
-          os-name: "alpine"
-          requires: [test-java]
-          # Catatan: Alpine memerlukan instalasi glibc tambahan
+      - test-java:
+          matrix:
+            parameters:
+              java-version: ["8", "11", "17", "21"]
+              os-type: ["ubuntu", "windows", "macos"]

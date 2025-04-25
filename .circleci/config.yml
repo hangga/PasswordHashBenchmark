@@ -2,29 +2,26 @@
 # Stacks detected: deps:java:.,tool:gradle:
 version: 2.1
 
-parameters:
-  java-version:
-    type: string
-    default: "17"
-  os-type:
-    type: string
-    default: "ubuntu"
-
 executors:
-  docker-java:
+  ubuntu-java:
     parameters:
       java-version:
         type: string
     docker:
-      - image: cimg/openjdk:<<parameters.java-version>>
-    working_directory: ~/project
+      - image: cimg/openjdk:<< parameters.java-version >>
 
-  windows:
+  debian-java:
+    parameters:
+      java-version:
+        type: string
+    docker:
+      - image: circleci/openjdk:<< parameters.java-version >>
+
+  windows-java:
     machine:
-      image: windows-server-2022-gui
-    shell: powershell.exe
+      image: windows-server-2019
 
-  macos:
+  macos-java:
     macos:
       xcode: "14.3.1"
 
@@ -33,17 +30,13 @@ jobs:
     parameters:
       java-version:
         type: string
-      os-type:
+      os:
         type: string
     executor:
-      <<: *executor-selector
+      name: << parameters.os >>-java
+      java-version: << parameters.java-version >>
     steps:
       - checkout
-      - run:
-          name: Set up Java (for Windows/macOS)
-          when: on_fail
-          command: |
-            echo "Java setup required for non-Docker OS"
       - run:
           name: Calculate cache key
           command: |
@@ -51,7 +44,8 @@ jobs:
               sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
-      - run: ./gradlew check
+      - run:
+          command: ./gradlew check
       - store_test_results:
           path: build/test-results
       - save_cache:
@@ -68,4 +62,10 @@ workflows:
           matrix:
             parameters:
               java-version: ["8", "11", "17", "21"]
-              os-type: ["ubuntu", "windows", "macos"]
+              os: ["ubuntu", "debian"]
+      - test-java:
+          java-version: "17"
+          os: "windows"
+      - test-java:
+          java-version: "17"
+          os: "macos"

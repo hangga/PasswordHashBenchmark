@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'me.champeau.jmh' version '0.7.2' // Plugin JMH untuk Gradle
 }
 
 group = 'io.github.hangga'

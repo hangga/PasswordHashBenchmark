@@ -1,3 +1,5 @@
+package id.web.hangga;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -126,7 +128,6 @@ public class PasswordValidationTest {
     @Test
     public void givenRawPasswordAndSalt_whenArgon2AlgorithmIsUsed_thenHashIsCorrect() {
         byte[] salt = generateSalt16Byte();
-        String password = "Baeldung";
 
         int iterations = 2;
         int memLimit = 66536;

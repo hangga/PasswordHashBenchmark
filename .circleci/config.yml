@@ -25,7 +25,7 @@ jobs:
 
   benchmark-jmh:
     docker:
-      - image: cimg/openjdk:17.0
+      - image: cimg/openjdk:{{ java_version }}
     steps:
       - checkout
       - run:
@@ -42,5 +42,25 @@ workflows:
       - benchmark-jmh:
           matrix:
             parameters:
-              java_version: ["8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"]
-              os: ["ubuntu", "windows", "macos"]
+              java_version:
+                - "8"
+                - "9"
+                - "10"
+                - "11"
+                - "12"
+                - "13"
+                - "14"
+                - "15"
+                - "16"
+                - "17"
+                - "18"
+                - "19"
+                - "20"
+                - "21"
+                - "22"
+              os:
+                - "ubuntu"
+                - "windows"
+                - "macos"
+          docker:
+            - image: cimg/openjdk:{{ java_version }}

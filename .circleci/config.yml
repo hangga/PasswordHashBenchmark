@@ -2,6 +2,14 @@
 # Stacks detected: deps:java:.,tool:gradle:
 version: 2.1
 
+parameters:
+  java-version:
+    type: string
+    default: "17"
+  os-type:
+    type: string
+    default: "ubuntu"
+
 executors:
   docker-java:
     parameters:
@@ -25,9 +33,10 @@ jobs:
     parameters:
       java-version:
         type: string
-      os:
+      os-type:
         type: string
-    executor: <<parameters.os>>
+    executor:
+      <<: *executor-selector
     steps:
       - checkout
       - run:
@@ -59,4 +68,4 @@ workflows:
           matrix:
             parameters:
               java-version: ["8", "11", "17", "21"]
-              os: ["docker-java", "windows", "macos"]
+              os-type: ["docker-java", "windows", "macos"]

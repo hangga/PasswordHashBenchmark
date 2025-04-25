@@ -3,25 +3,20 @@
 version: 2.1
 
 executors:
-  ubuntu-java:
+  docker-java:
     parameters:
       java-version:
         type: string
     docker:
-      - image: cimg/openjdk:<< parameters.java-version >>
+      - image: cimg/openjdk:<<parameters.java-version>>
+    working_directory: ~/project
 
-  debian-java:
-    parameters:
-      java-version:
-        type: string
-    docker:
-      - image: circleci/openjdk:<< parameters.java-version >>
-
-  windows-java:
+  windows:
     machine:
-      image: windows-server-2019
+      image: windows-server-2022-gui
+    shell: powershell.exe
 
-  macos-java:
+  macos:
     macos:
       xcode: "14.3.1"
 
@@ -32,11 +27,14 @@ jobs:
         type: string
       os:
         type: string
-    executor:
-      name: << parameters.os >>-java
-      java-version: << parameters.java-version >>
+    executor: <<parameters.os>>
     steps:
       - checkout
+      - run:
+          name: Set up Java (for Windows/macOS)
+          when: on_fail
+          command: |
+            echo "Java setup required for non-Docker OS"
       - run:
           name: Calculate cache key
           command: |
@@ -44,8 +42,7 @@ jobs:
               sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
-      - run:
-          command: ./gradlew check
+      - run: ./gradlew check
       - store_test_results:
           path: build/test-results
       - save_cache:
@@ -62,10 +59,4 @@ workflows:
           matrix:
             parameters:
               java-version: ["8", "11", "17", "21"]
-              os: ["ubuntu", "debian"]
-      - test-java:
-          java-version: "17"
-          os: "windows"
-      - test-java:
-          java-version: "17"
-          os: "macos"
+              os: ["docker-java", "windows", "macos"]

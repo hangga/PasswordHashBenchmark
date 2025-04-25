@@ -3,94 +3,92 @@
 version: 2.1
 
 jobs:
+  # Job test standar (tetap sederhana)
   test-java:
-    parameters:
-      java-version:
-        type: string
-      os-image:
-        type: string
     docker:
-      - image: << parameters.os-image >>
-    environment:
-      JAVA_VERSION: << parameters.java-version >>
+      - image: cimg/openjdk:17.0  # Ubuntu LTS dengan Java 17
     steps:
       - checkout
       - run:
-          name: Setup Java << parameters.java-version >>
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y wget
-            wget https://download.java.net/java/GA/jdk${JAVA_VERSION}/GPL/openjdk-${JAVA_VERSION}_linux-x64_bin.tar.gz
-            sudo tar xzvf openjdk-${JAVA_VERSION}_linux-x64_bin.tar.gz -C /usr/local/
-            export JAVA_HOME=/usr/local/jdk-${JAVA_VERSION}
-            export PATH=$JAVA_HOME/bin:$PATH
-      - run:
-          name: Calculate cache key
-          command: |
-            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
-      - restore_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os-image >>
-      - run:
-          name: Run tests with Java << parameters.java-version >>
+          name: Run tests
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
-      - save_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os-image >>
-          paths:
-            - ~/.gradle/caches
       - store_artifacts:
           path: build/reports
 
+  # Job benchmark dengan matriks OS + Java
   benchmark-jmh:
     parameters:
       java-version:
         type: string
       os-image:
         type: string
+      os-name:
+        type: string  # Label untuk tampilan UI
     docker:
       - image: << parameters.os-image >>
-    environment:
-      JAVA_VERSION: << parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Setup Java << parameters.java-version >>
+          name: Setup Java << parameters.java-version >> on << parameters.os-name >>
           command: |
-            sudo apt-get update
-            sudo apt-get install -y wget
-            wget https://download.java.net/java/GA/jdk${JAVA_VERSION}/GPL/openjdk-${JAVA_VERSION}_linux-x64_bin.tar.gz
-            sudo tar xzvf openjdk-${JAVA_VERSION}_linux-x64_bin.tar.gz -C /usr/local/
-            export JAVA_HOME=/usr/local/jdk-${JAVA_VERSION}
-            export PATH=$JAVA_HOME/bin:$PATH
+            # Skip instalasi jika image sudah menyediakan Java versi yang benar
+            if ! java -version 2>&1 | grep -q "version \"<< parameters.java-version >>"; then
+              echo "Installing Java << parameters.java-version >>..."
+              sudo apt-get update
+              sudo apt-get install -y wget
+              wget -O openjdk.tar.gz https://download.java.net/java/GA/jdk<< parameters.java-version >>/GPL/openjdk-<< parameters.java-version >>_linux-x64_bin.tar.gz
+              sudo mkdir -p /usr/lib/jvm
+              sudo tar xzf openjdk.tar.gz -C /usr/lib/jvm
+              export JAVA_HOME="/usr/lib/jvm/jdk-<< parameters.java-version >>"
+              export PATH="$JAVA_HOME/bin:$PATH"
+            fi
       - run:
-          name: Run JMH Benchmark with Java << parameters.java-version >>
+          name: Run JMH Benchmark
           command: ./gradlew jmh
       - store_artifacts:
-          path: build/reports
+          path: build/reports/jmh
+          destination: jmh-report-<< parameters.os-name >>-jdk<< parameters.java-version >>
 
 workflows:
+  version: 2
   build-and-test:
     jobs:
-      - test-java:
-          name: "Test Java << matrix.java-version >> on << matrix.os-image >>"
-          matrix:
-            parameters:
-              java-version: ["11", "17", "21"]
-              os-image:
-                - "cimg/base:2024.01-ubuntu"
-                - "cimg/base:2024.01-debian"
-                # Windows and Mac require machine executor which has different syntax
-          exclude:
-            # Exclude combinations that don't make sense or aren't supported
-            - java-version: "21"
-              os-image: "cimg/base:2024.01-debian"  # Example exclusion
+      - test-java
+      # Ubuntu + Multi Java Version
       - benchmark-jmh:
-          name: "Benchmark Java << matrix.java-version >> on << matrix.os-image >>"
-          matrix:
-            parameters:
-              java-version: ["11", "17"]
-              os-image: ["cimg/base:2024.01-ubuntu"]
-          requires:
-            - "Test Java 11 on cimg/base:2024.01-ubuntu"  # Example dependency
+          name: "Benchmark - Ubuntu (JDK 11)"
+          java-version: "11"
+          os-image: "cimg/base:2024.01-ubuntu"
+          os-name: "ubuntu"
+          requires: [test-java]
+      - benchmark-jmh:
+          name: "Benchmark - Ubuntu (JDK 17)"
+          java-version: "17"
+          os-image: "cimg/openjdk:17.0"  # Image khusus Java 17
+          os-name: "ubuntu"
+          requires: [test-java]
+      - benchmark-jmh:
+          name: "Benchmark - Ubuntu (JDK 21)"
+          java-version: "21"
+          os-image: "cimg/base:2024.01-ubuntu"
+          os-name: "ubuntu"
+          requires: [test-java]
+
+      # Debian
+      - benchmark-jmh:
+          name: "Benchmark - Debian (JDK 17)"
+          java-version: "17"
+          os-image: "cimg/base:2024.01-debian"
+          os-name: "debian"
+          requires: [test-java]
+
+      # Alpine (Lightweight)
+      - benchmark-jmh:
+          name: "Benchmark - Alpine (JDK 17)"
+          java-version: "17"
+          os-image: "alpine:3.19"
+          os-name: "alpine"
+          requires: [test-java]
+          # Catatan: Alpine memerlukan instalasi glibc tambahan

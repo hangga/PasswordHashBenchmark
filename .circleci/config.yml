@@ -55,7 +55,6 @@ jobs:
 
   benchmark-windows:
     machine:
-      image: windows-server-2022
       resource_class: windows.medium
     steps:
       - checkout
@@ -69,7 +68,6 @@ jobs:
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
-
 
 workflows:
   build-and-test:

@@ -1,5 +1,10 @@
 version: 2.1
 
+parameters:
+  java-version:
+    type: string
+    default: "17"
+
 jobs:
   test-java:
     docker:
@@ -25,46 +30,54 @@ jobs:
           path: build/reports
 
   benchmark-linux:
+    parameters:
+      java-version:
+        type: string
     docker:
-      - image: cimg/openjdk:17.0
+      - image: cimg/openjdk:<< parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark on Linux
+          name: Run JMH Benchmark on Linux (Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
 
   benchmark-macos:
+    parameters:
+      java-version:
+        type: string
     macos:
-      xcode: "14.2.0" # Xcode version, bisa diganti
+      xcode: "14.2.0"
     steps:
       - checkout
       - run:
-          name: Install Java
+          name: Install Java << parameters.java-version >>
           command: |
-            brew install openjdk@17
-            sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
-            export JAVA_HOME=/opt/homebrew/opt/openjdk@17
-            echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@17' >> $BASH_ENV
+            brew install openjdk@<< parameters.java-version >>
+            sudo ln -sfn /opt/homebrew/opt/openjdk@<< parameters.java-version >>/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk
+            echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@<< parameters.java-version >>' >> $BASH_ENV
       - run:
-          name: Run JMH Benchmark on macOS
+          name: Run JMH Benchmark on macOS (Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
 
   benchmark-windows:
+    parameters:
+      java-version:
+        type: string
     machine:
       resource_class: windows.medium
     steps:
       - checkout
       - run:
-          name: Install Java 17
+          name: Install Java << parameters.java-version >>
           command: |
-            choco install openjdk17
-            setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-17"
+            choco install openjdk<< parameters.java-version >>
+            setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-<< parameters.java-version >>"
       - run:
-          name: Run JMH Benchmark on Windows
+          name: Run JMH Benchmark on Windows (Java << parameters.java-version >>)
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
@@ -73,6 +86,15 @@ workflows:
   build-and-test:
     jobs:
       - test-java
-      - benchmark-linux
-      - benchmark-macos
-      - benchmark-windows
+      - benchmark-linux:
+          matrix:
+            parameters:
+              java-version: ["17.0", "21.0"]
+      - benchmark-macos:
+          matrix:
+            parameters:
+              java-version: ["17", "21"]
+      - benchmark-windows:
+          matrix:
+            parameters:
+              java-version: ["17"]

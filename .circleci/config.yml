@@ -1,54 +1,87 @@
 version: 2.1
+
+# Define reusable executors for different OS environments
+executors:
+  linux-java:
+    docker:
+      - image: cimg/openjdk:<< parameters.version >>
+    parameters:
+      version:
+        type: string
+        default: "17.0"
+
+  macos-java:
+    macos:
+      xcode: "13.3.0"
+    resource_class: medium
+    shell: /bin/bash --login -eo pipefail
+    parameters:
+      version:
+        type: string
+        default: "17.0"
+    environment:
+      JAVA_HOME: /Library/Java/JavaVirtualMachines/adoptopenjdk-<< parameters.version >>.jdk/Contents/Home
+
 jobs:
   test-java:
-    docker:
-      - image: cimg/openjdk:17.0
+    parameters:
+      java-version:
+        type: string
+        default: "17.0"
+      os:
+        type: string
+        default: "linux"
+    executor: <<#parameters.os>> <<parameters.os>>-java <</parameters.os>>-java
     steps:
       - checkout
+      - when:
+          condition: << parameters.os >> == "macos"
+          steps:
+            - run:
+                name: Install specific Java version on macOS
+                command: |
+                  brew tap adoptopenjdk/openjdk
+                  brew install --cask adoptopenjdk<< parameters.java-version >>
       - run:
           name: Calculate cache key
-          command: |-
+          command: |
             find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
                     sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os >>
       - run:
+          name: Run tests with Java << parameters.java-version >> on << parameters.os >>
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
       - save_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os >>
           paths:
             - ~/.gradle/caches
       - store_artifacts:
           path: build/reports
 
-#  benchmark-jmh:
-#    docker:
-#      - image: cimg/openjdk:17.0
-#    steps:
-#      - checkout
-#      - run:
-#          name: Run JMH Benchmark
-#          command: ./gradlew jmh
-#      - store_artifacts:
-#          path: build/reports
-
-  benchmark-jmh-matrix:
-    docker:
-      - image: cimg/openjdk:<< parameters.java_version >>
+  benchmark-jmh:
     parameters:
-      java_version:
-        type: enum
+      java-version:
+        type: string
         default: "17.0"
-        enum:
-          - "8.0"
-          - "11.0"
-          - "17.0"
+      os:
+        type: string
+        default: "linux"
+    executor: <<#parameters.os>> <<parameters.os>>-java <</parameters.os>>-java
     steps:
       - checkout
+      - when:
+          condition: << parameters.os >> == "macos"
+          steps:
+            - run:
+                name: Install specific Java version on macOS
+                command: |
+                  brew tap adoptopenjdk/openjdk
+                  brew install --cask adoptopenjdk<< parameters.java-version >>
       - run:
-          name: Run JMH Benchmark on Java << parameters.java_version >>
+          name: Run JMH Benchmark with Java << parameters.java-version >> on << parameters.os >>
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -56,12 +89,17 @@ jobs:
 workflows:
   build-and-test:
     jobs:
-      - test-java
-#      - benchmark-jmh
-      - benchmark-jmh-matrix:
+      - test-java:
           matrix:
             parameters:
-              java_version:
-                - "8.0"
-                - "11.0"
-                - "17.0"
+              java-version: ["11.0", "17.0", "21.0"]
+              os: ["linux", "macos"]
+          name: "Test Java << matrix.java-version >> on << matrix.os >>"
+      - benchmark-jmh:
+          matrix:
+            parameters:
+              java-version: ["17.0", "21.0"]
+              os: ["linux"]
+          name: "Benchmark Java << matrix.java-version >> on << matrix.os >>"
+          requires:
+            - "Test Java 17.0 on linux"

@@ -1,34 +1,32 @@
 version: 2.1
 
-parameters:
-  java-version:
-    type: string
-    default: "17.0"
-
 executors:
   linux-java:
+    parameters:
+      java-version:
+        type: string
     docker:
       - image: cimg/openjdk:<< parameters.java-version >>
-    parameters:
-      java-version:
-        type: string
 
   macos-java:
+    parameters:
+      java-version:
+        type: string
     macos:
       xcode: "14.2.0"
-    parameters:
-      java-version:
-        type: string
 
   windows-java:
-    machine:
-      resource_class: windows.medium
     parameters:
       java-version:
         type: string
+    machine:
+      resource_class: windows.medium
 
 jobs:
   test-java:
+    parameters:
+      java-version:
+        type: string
     executor:
       name: linux-java
       java-version: << parameters.java-version >>
@@ -41,6 +39,7 @@ jobs:
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
+          name: Run Tests
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
@@ -52,6 +51,9 @@ jobs:
           path: build/reports
 
   benchmark-linux:
+    parameters:
+      java-version:
+        type: string
     executor:
       name: linux-java
       java-version: << parameters.java-version >>
@@ -64,13 +66,16 @@ jobs:
           path: build/reports
 
   benchmark-macos:
+    parameters:
+      java-version:
+        type: string
     executor:
       name: macos-java
       java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Install Java
+          name: Install Java on macOS
           command: |
             brew install openjdk@<< parameters.java-version >>
             sudo ln -sfn /opt/homebrew/opt/openjdk@<< parameters.java-version >>/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk
@@ -82,13 +87,16 @@ jobs:
           path: build/reports
 
   benchmark-windows:
+    parameters:
+      java-version:
+        type: string
     executor:
       name: windows-java
       java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Install Java
+          name: Install Java on Windows
           command: |
             choco install openjdk<< parameters.java-version >>
             setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-<< parameters.java-version >>"

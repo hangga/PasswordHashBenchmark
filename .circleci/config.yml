@@ -1,25 +1,5 @@
 version: 2.1
 
-executors:
-  linux-java:
-    parameters:
-      java-version:
-        type: string
-    docker:
-      - image: cimg/openjdk:<< parameters.java-version >>
-
-  macos-java:
-    macos:
-      xcode: 14.2
-    environment:
-      JAVA_HOME: /Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
-
-  windows-java:
-    machine:
-      image: windows-server-2022-gui
-    environment:
-      JAVA_HOME: "C:\\openjdk\\jdk-17"
-
 jobs:
   test-java:
     docker:
@@ -28,9 +8,9 @@ jobs:
       - checkout
       - run:
           name: Calculate cache key
-          command: |
+          command: |-
             find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-              sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
@@ -44,37 +24,45 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh-linux:
-    parameters:
-      java-version:
-        type: string
-    executor:
-      name: linux-java
-      java-version: << parameters.java-version >>
+  benchmark-linux:
+    docker:
+      - image: cimg/openjdk:17.0
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark
+          name: Run JMH Benchmark on Linux
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh-macos:
-    executor: macos-java
+  benchmark-macos:
+    macos:
+      xcode: "14.2.0" # Xcode version, bisa diganti
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark
+          name: Install Java
+          command: |
+            brew install openjdk@17
+            sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+            export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+            echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@17' >> $BASH_ENV
+      - run:
+          name: Run JMH Benchmark on macOS
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh-windows:
-    executor: windows-java
+  benchmark-windows:
+    machine:
+      image: windows-server-2019
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark
+          name: Install Java
+          command: choco install openjdk17
+      - run:
+          name: Run JMH Benchmark on Windows
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
@@ -83,9 +71,6 @@ workflows:
   build-and-test:
     jobs:
       - test-java
-      - benchmark-jmh-linux:
-          matrix:
-            parameters:
-              java-version: ["8.0", "11.0", "17.0"]
-      - benchmark-jmh-macos
-      - benchmark-jmh-windows
+      - benchmark-linux
+      - benchmark-macos
+      - benchmark-windows

@@ -23,9 +23,20 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh:
+#  benchmark-jmh:
+#    docker:
+#      - image: cimg/openjdk:17.0
+#    steps:
+#      - checkout
+#      - run:
+#          name: Run JMH Benchmark
+#          command: ./gradlew jmh
+#      - store_artifacts:
+#          path: build/reports
+
+  benchmark-jmh-matrix:
     docker:
-      - image: cimg/openjdk:{{ .parameters.java_version }}  # Menggunakan versi Java dari parameter
+      - image: cimg/openjdk:<< parameters.java_version >>
     parameters:
       java_version:
         type: enum
@@ -37,7 +48,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark on Java {{ .parameters.java_version }}
+          name: Run JMH Benchmark on Java << parameters.java_version >>
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -46,7 +57,8 @@ workflows:
   build-and-test:
     jobs:
       - test-java
-      - benchmark-jmh:
+#      - benchmark-jmh
+      - benchmark-jmh-matrix:
           matrix:
             parameters:
               java_version:

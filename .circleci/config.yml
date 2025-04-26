@@ -1,16 +1,43 @@
 version: 2.1
 
+parameters:
+  java-version:
+    type: string
+    default: "17.0"
+
+executors:
+  linux-java:
+    docker:
+      - image: cimg/openjdk:<< parameters.java-version >>
+    parameters:
+      java-version:
+        type: string
+
+  macos-java:
+    macos:
+      xcode: "14.2.0"
+    parameters:
+      java-version:
+        type: string
+
+  windows-java:
+    machine:
+      resource_class: windows.medium
+    parameters:
+      java-version:
+        type: string
+
 jobs:
   test-java:
-    docker:
-      - image: cimg/openjdk:17.0
+    executor:
+      name: linux-java
+      java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
           name: Calculate cache key
-          command: |-
-            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+          command: |
+            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
@@ -25,8 +52,9 @@ jobs:
           path: build/reports
 
   benchmark-linux:
-    docker:
-      - image: cimg/openjdk:17.0
+    executor:
+      name: linux-java
+      java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
@@ -36,17 +64,17 @@ jobs:
           path: build/reports
 
   benchmark-macos:
-    macos:
-      xcode: "14.2.0" # Xcode version, bisa diganti
+    executor:
+      name: macos-java
+      java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
           name: Install Java
           command: |
-            brew install openjdk@17
-            sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
-            export JAVA_HOME=/opt/homebrew/opt/openjdk@17
-            echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@17' >> $BASH_ENV
+            brew install openjdk@<< parameters.java-version >>
+            sudo ln -sfn /opt/homebrew/opt/openjdk@<< parameters.java-version >>/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk
+            echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@<< parameters.java-version >>' >> $BASH_ENV
       - run:
           name: Run JMH Benchmark on macOS
           command: ./gradlew jmh
@@ -54,15 +82,16 @@ jobs:
           path: build/reports
 
   benchmark-windows:
-    machine:
-      resource_class: windows.medium
+    executor:
+      name: windows-java
+      java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Install Java 17
+          name: Install Java
           command: |
-            choco install openjdk17
-            setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-17"
+            choco install openjdk<< parameters.java-version >>
+            setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-<< parameters.java-version >>"
       - run:
           name: Run JMH Benchmark on Windows
           command: ./gradlew.bat jmh
@@ -72,7 +101,19 @@ jobs:
 workflows:
   build-and-test:
     jobs:
-      - test-java
-      - benchmark-linux
-      - benchmark-macos
-      - benchmark-windows
+      - test-java:
+          matrix:
+            parameters:
+              java-version: ["11.0", "17.0", "21.0"]
+      - benchmark-linux:
+          matrix:
+            parameters:
+              java-version: ["11.0", "17.0", "21.0"]
+      - benchmark-macos:
+          matrix:
+            parameters:
+              java-version: ["11", "17", "21"]
+      - benchmark-windows:
+          matrix:
+            parameters:
+              java-version: ["11", "17", "21"]

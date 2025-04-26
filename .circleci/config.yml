@@ -8,26 +8,13 @@ parameters:
 jobs:
   test-java:
     docker:
-      - image: cimg/openjdk:17.0
+      - image: cimg/openjdk:<< parameters.java-version >>
     steps:
       - checkout
-      - run:
-          name: Calculate cache key
-          command: |-
-            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
-      - restore_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
-      - save_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
-          paths:
-            - ~/.gradle/caches
-      - store_artifacts:
-          path: build/reports
 
   benchmark-linux:
     parameters:
@@ -38,7 +25,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark on Linux (Java << parameters.java-version >>)
+          name: Run JMH Benchmark (Linux, Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -55,10 +42,9 @@ jobs:
           name: Install Java << parameters.java-version >>
           command: |
             brew install openjdk@<< parameters.java-version >>
-            sudo ln -sfn /opt/homebrew/opt/openjdk@<< parameters.java-version >>/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk
             echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@<< parameters.java-version >>' >> $BASH_ENV
       - run:
-          name: Run JMH Benchmark on macOS (Java << parameters.java-version >>)
+          name: Run JMH Benchmark (macOS, Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -77,24 +63,27 @@ jobs:
             choco install openjdk<< parameters.java-version >>
             setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-<< parameters.java-version >>"
       - run:
-          name: Run JMH Benchmark on Windows (Java << parameters.java-version >>)
+          name: Run JMH Benchmark (Windows, Java << parameters.java-version >>)
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
 
 workflows:
-  build-and-test:
+  build-and-benchmark:
     jobs:
       - test-java
       - benchmark-linux:
+          name: Benchmark - Linux (JDK << matrix.java-version >>)
           matrix:
             parameters:
               java-version: ["17.0", "21.0"]
       - benchmark-macos:
+          name: Benchmark - macOS (JDK << matrix.java-version >>)
           matrix:
             parameters:
               java-version: ["17", "21"]
       - benchmark-windows:
+          name: Benchmark - Windows (JDK << matrix.java-version >>)
           matrix:
             parameters:
               java-version: ["17"]

@@ -1,45 +1,24 @@
 version: 2.1
 
-executors:
-  linux-java:
-    parameters:
-      java-version:
-        type: string
-    docker:
-      - image: cimg/openjdk:<< parameters.java-version >>
-
-  macos-java:
-    parameters:
-      java-version:
-        type: string
-    macos:
-      xcode: "14.2.0"
-
-  windows-java:
-    parameters:
-      java-version:
-        type: string
-    machine:
-      resource_class: windows.medium
+parameters:
+  java-version:
+    type: string
+    default: "17"
 
 jobs:
   test-java:
-    parameters:
-      java-version:
-        type: string
-    executor:
-      name: linux-java
-      java-version: << parameters.java-version >>
+    docker:
+      - image: cimg/openjdk:17.0
     steps:
       - checkout
       - run:
           name: Calculate cache key
-          command: |
-            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+          command: |-
+            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
+                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
           key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
-          name: Run Tests
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
@@ -54,13 +33,12 @@ jobs:
     parameters:
       java-version:
         type: string
-    executor:
-      name: linux-java
-      java-version: << parameters.java-version >>
+    docker:
+      - image: cimg/openjdk:<< parameters.java-version >>
     steps:
       - checkout
       - run:
-          name: Run JMH Benchmark on Linux
+          name: Run JMH Benchmark on Linux (Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -69,19 +47,18 @@ jobs:
     parameters:
       java-version:
         type: string
-    executor:
-      name: macos-java
-      java-version: << parameters.java-version >>
+    macos:
+      xcode: "14.2.0"
     steps:
       - checkout
       - run:
-          name: Install Java on macOS
+          name: Install Java << parameters.java-version >>
           command: |
             brew install openjdk@<< parameters.java-version >>
             sudo ln -sfn /opt/homebrew/opt/openjdk@<< parameters.java-version >>/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk
             echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@<< parameters.java-version >>' >> $BASH_ENV
       - run:
-          name: Run JMH Benchmark on macOS
+          name: Run JMH Benchmark on macOS (Java << parameters.java-version >>)
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
@@ -90,18 +67,17 @@ jobs:
     parameters:
       java-version:
         type: string
-    executor:
-      name: windows-java
-      java-version: << parameters.java-version >>
+    machine:
+      resource_class: windows.medium
     steps:
       - checkout
       - run:
-          name: Install Java on Windows
+          name: Install Java << parameters.java-version >>
           command: |
             choco install openjdk<< parameters.java-version >>
             setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-<< parameters.java-version >>"
       - run:
-          name: Run JMH Benchmark on Windows
+          name: Run JMH Benchmark on Windows (Java << parameters.java-version >>)
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
@@ -109,19 +85,16 @@ jobs:
 workflows:
   build-and-test:
     jobs:
-      - test-java:
-          matrix:
-            parameters:
-              java-version: ["11.0", "17.0", "21.0"]
+      - test-java
       - benchmark-linux:
           matrix:
             parameters:
-              java-version: ["11.0", "17.0", "21.0"]
+              java-version: ["8.0", "11.0", "17.0", "21.0"]
       - benchmark-macos:
           matrix:
             parameters:
-              java-version: ["11", "17", "21"]
+              java-version: ["17", "21"]
       - benchmark-windows:
           matrix:
             parameters:
-              java-version: ["11", "17", "21"]
+              java-version: ["17", "21"]

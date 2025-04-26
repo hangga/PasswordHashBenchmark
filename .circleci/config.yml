@@ -1,17 +1,13 @@
 version: 2.1
 
-parameters:
-  java-version:
-    type: string
-    default: "17"
-
 jobs:
   test-java:
     docker:
-      - image: cimg/openjdk:<< parameters.java-version >>
+      - image: cimg/openjdk:17.0 # fix pakai Java 17
     steps:
       - checkout
       - run:
+          name: Run Unit Tests
           command: ./gradlew check
       - store_test_results:
           path: build/test-results

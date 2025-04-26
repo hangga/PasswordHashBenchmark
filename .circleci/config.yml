@@ -1,13 +1,5 @@
 version: 2.1
 
-parameters:
-  java-version:
-    type: string
-    default: "17.0"
-  os:
-    type: string
-    default: "linux"
-
 executors:
   linux-java:
     parameters:
@@ -17,22 +9,16 @@ executors:
       - image: cimg/openjdk:<< parameters.java-version >>
 
   macos-java:
-    parameters:
-      java-version:
-        type: string
     macos:
-      xcode: 14.2  # versi macOS dengan JDK terpasang
+      xcode: 14.2
     environment:
-      JAVA_HOME: /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk/Contents/Home
+      JAVA_HOME: /Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
 
   windows-java:
-    parameters:
-      java-version:
-        type: string
     machine:
       image: windows-server-2022-gui
     environment:
-      JAVA_HOME: C:\openjdk-<< parameters.java-version >>
+      JAVA_HOME: "C:\\openjdk\\jdk-17"
 
 jobs:
   test-java:
@@ -58,14 +44,12 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-  benchmark-jmh:
+  benchmark-jmh-linux:
     parameters:
       java-version:
         type: string
-      os:
-        type: string
     executor:
-      name: << include "os-executor" >>
+      name: linux-java
       java-version: << parameters.java-version >>
     steps:
       - checkout
@@ -75,23 +59,33 @@ jobs:
       - store_artifacts:
           path: build/reports
 
-commands:
-  # Helper to resolve executor based on OS
-  os-executor:
-    parameters:
-      java-version:
-        type: string
-      os:
-        type: string
-    return:
-      <<#if (eq parameters.os "macos")>>macos-java<<else>><<#if (eq parameters.os "windows")>>windows-java<<else>>linux-java<</if>><</if>>
+  benchmark-jmh-macos:
+    executor: macos-java
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark
+          command: ./gradlew jmh
+      - store_artifacts:
+          path: build/reports
+
+  benchmark-jmh-windows:
+    executor: windows-java
+    steps:
+      - checkout
+      - run:
+          name: Run JMH Benchmark
+          command: ./gradlew.bat jmh
+      - store_artifacts:
+          path: build/reports
 
 workflows:
   build-and-test:
     jobs:
       - test-java
-      - benchmark-jmh:
+      - benchmark-jmh-linux:
           matrix:
             parameters:
               java-version: ["8.0", "11.0", "17.0"]
-              os: ["linux", "macos", "windows"]
+      - benchmark-jmh-macos
+      - benchmark-jmh-windows

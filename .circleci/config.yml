@@ -1,63 +1,46 @@
 version: 2.1
 
-# Define reusable executors for different OS environments
-executors:
-  linux-java:
-    docker:
-      - image: cimg/openjdk:<< parameters.version >>
-    parameters:
-      version:
-        type: string
-        default: "17"
+parameters:
+  java_version:
+    type: string
+    default: "17.0"
+  docker_image:
+    type: string
+    default: "cimg/openjdk:17.0"
 
-  macos-java:
-    macos:
-      xcode: "13.3.0"
-    resource_class: medium
-    shell: /bin/bash --login -eo pipefail
+executors:
+  java_executor:
     parameters:
-      version:
+      docker_image:
         type: string
-        default: "17"
-    environment:
-      JAVA_HOME: /Library/Java/JavaVirtualMachines/adoptopenjdk-<< parameters.version >>.jdk/Contents/Home
+    docker:
+      - image: << parameters.docker_image >>
 
 jobs:
   test-java:
     parameters:
-      java-version:
+      java_version:
         type: string
-        default: "17"
-      os:
+      docker_image:
         type: string
-        default: "linux"
     executor:
-      name: << parameters.os >>-java
-      version: << parameters.java-version >>
+      name: java_executor
+      docker_image: << parameters.docker_image >>
     steps:
       - checkout
-      - when:
-          condition: << parameters.os >> == "macos"
-          steps:
-            - run:
-                name: Install specific Java version on macOS
-                command: |
-                  brew tap adoptopenjdk/openjdk
-                  brew install --cask adoptopenjdk<< parameters.java-version >>
       - run:
           name: Calculate cache key
           command: |
             find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+              sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
       - restore_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os >>
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
       - run:
-          name: Run tests with Java << parameters.java-version >> on << parameters.os >>
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
       - save_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}-<< parameters.java-version >>-<< parameters.os >>
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
           paths:
             - ~/.gradle/caches
       - store_artifacts:
@@ -65,45 +48,37 @@ jobs:
 
   benchmark-jmh:
     parameters:
-      java-version:
+      java_version:
         type: string
-        default: "17"
-      os:
+      docker_image:
         type: string
-        default: "linux"
     executor:
-      name: << parameters.os >>-java
-      version: << parameters.java-version >>
+      name: java_executor
+      docker_image: << parameters.docker_image >>
     steps:
       - checkout
-      - when:
-          condition: << parameters.os >> == "macos"
-          steps:
-            - run:
-                name: Install specific Java version on macOS
-                command: |
-                  brew tap adoptopenjdk/openjdk
-                  brew install --cask adoptopenjdk<< parameters.java-version >>
       - run:
-          name: Run JMH Benchmark with Java << parameters.java-version >> on << parameters.os >>
+          name: Run JMH Benchmark
           command: ./gradlew jmh
       - store_artifacts:
           path: build/reports
 
 workflows:
   build-and-test:
+    matrix:
+      parameters:
+        java_version: ["8.0", "11.0", "17.0", "21.0"]
+        docker_image:
+          [
+            "cimg/openjdk:8.0",
+            "cimg/openjdk:11.0",
+            "cimg/openjdk:17.0",
+            "cimg/openjdk:21.0"
+          ]
     jobs:
       - test-java:
-          matrix:
-            parameters:
-              java-version: ["11", "17", "21"]
-              os: ["linux", "macos"]
-          name: "Test Java << matrix.java-version >> on << matrix.os >>"
+          java_version: << matrix.java_version >>
+          docker_image: << matrix.docker_image >>
       - benchmark-jmh:
-          matrix:
-            parameters:
-              java-version: ["17", "21"]
-              os: ["linux"]
-          name: "Benchmark Java << matrix.java-version >> on << matrix.os >>"
-          requires:
-            - "Test Java 17 on linux"
+          java_version: << matrix.java_version >>
+          docker_image: << matrix.docker_image >>

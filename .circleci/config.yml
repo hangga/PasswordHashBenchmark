@@ -55,17 +55,21 @@ jobs:
 
   benchmark-windows:
     machine:
-      image: windows-server-2019
+      image: windows-server-2022
+      resource_class: windows.medium
     steps:
       - checkout
       - run:
-          name: Install Java
-          command: choco install openjdk17
+          name: Install Java 17
+          command: |
+            choco install openjdk17
+            setx JAVA_HOME "C:\Program Files\OpenJDK\openjdk-17"
       - run:
           name: Run JMH Benchmark on Windows
           command: ./gradlew.bat jmh
       - store_artifacts:
           path: build/reports
+
 
 workflows:
   build-and-test:

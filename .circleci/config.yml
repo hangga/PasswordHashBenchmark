@@ -31,7 +31,9 @@ jobs:
       os:
         type: string
         default: "linux"
-    executor: <<#parameters.os>> <<parameters.os>>-java <</parameters.os>>-java
+    executor: << parameters.os >>-java
+    parameters:
+      version: << parameters.java-version >>
     steps:
       - checkout
       - when:
@@ -69,7 +71,9 @@ jobs:
       os:
         type: string
         default: "linux"
-    executor: <<#parameters.os>> <<parameters.os>>-java <</parameters.os>>-java
+    executor: << parameters.os >>-java
+    parameters:
+      version: << parameters.java-version >>
     steps:
       - checkout
       - when:
@@ -92,14 +96,14 @@ workflows:
       - test-java:
           matrix:
             parameters:
-              java-version: ["11.0", "17.0", "21.0"]
+              java-version: ["11", "17", "21"]
               os: ["linux", "macos"]
           name: "Test Java << matrix.java-version >> on << matrix.os >>"
       - benchmark-jmh:
           matrix:
             parameters:
-              java-version: ["17.0", "21.0"]
+              java-version: ["17", "21"]
               os: ["linux"]
           name: "Benchmark Java << matrix.java-version >> on << matrix.os >>"
           requires:
-            - "Test Java 17.0 on linux"
+            - "Test Java 17 on linux"

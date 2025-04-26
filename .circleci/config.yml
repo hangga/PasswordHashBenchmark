@@ -1,31 +1,43 @@
 version: 2.1
 
 parameters:
-  java_version:
+  java-version:
     type: string
     default: "17.0"
-  docker_image:
+  os:
     type: string
-    default: "cimg/openjdk:17.0"
+    default: "linux"
 
 executors:
-  java_executor:
+  linux-java:
     parameters:
-      docker_image:
+      java-version:
         type: string
     docker:
-      - image: << parameters.docker_image >>
+      - image: cimg/openjdk:<< parameters.java-version >>
+
+  macos-java:
+    parameters:
+      java-version:
+        type: string
+    macos:
+      xcode: 14.2  # versi macOS dengan JDK terpasang
+    environment:
+      JAVA_HOME: /Library/Java/JavaVirtualMachines/openjdk-<< parameters.java-version >>.jdk/Contents/Home
+
+  windows-java:
+    parameters:
+      java-version:
+        type: string
+    machine:
+      image: windows-server-2022-gui
+    environment:
+      JAVA_HOME: C:\openjdk-<< parameters.java-version >>
 
 jobs:
   test-java:
-    parameters:
-      java_version:
-        type: string
-      docker_image:
-        type: string
-    executor:
-      name: java_executor
-      docker_image: << parameters.docker_image >>
+    docker:
+      - image: cimg/openjdk:17.0
     steps:
       - checkout
       - run:
@@ -48,13 +60,13 @@ jobs:
 
   benchmark-jmh:
     parameters:
-      java_version:
+      java-version:
         type: string
-      docker_image:
+      os:
         type: string
     executor:
-      name: java_executor
-      docker_image: << parameters.docker_image >>
+      name: << include "os-executor" >>
+      java-version: << parameters.java-version >>
     steps:
       - checkout
       - run:
@@ -63,22 +75,23 @@ jobs:
       - store_artifacts:
           path: build/reports
 
+commands:
+  # Helper to resolve executor based on OS
+  os-executor:
+    parameters:
+      java-version:
+        type: string
+      os:
+        type: string
+    return:
+      <<#if (eq parameters.os "macos")>>macos-java<<else>><<#if (eq parameters.os "windows")>>windows-java<<else>>linux-java<</if>><</if>>
+
 workflows:
   build-and-test:
-    matrix:
-      parameters:
-        java_version: ["8.0", "11.0", "17.0", "21.0"]
-        docker_image:
-          [
-            "cimg/openjdk:8.0",
-            "cimg/openjdk:11.0",
-            "cimg/openjdk:17.0",
-            "cimg/openjdk:21.0"
-          ]
     jobs:
-      - test-java:
-          java_version: << matrix.java_version >>
-          docker_image: << matrix.docker_image >>
+      - test-java
       - benchmark-jmh:
-          java_version: << matrix.java_version >>
-          docker_image: << matrix.docker_image >>
+          matrix:
+            parameters:
+              java-version: ["8.0", "11.0", "17.0"]
+              os: ["linux", "macos", "windows"]

@@ -3,14 +3,26 @@ version: 2.1
 jobs:
   test-java:
     docker:
-      - image: cimg/openjdk:17.0 # fix pakai Java 17
+      - image: cimg/openjdk:17.0
     steps:
       - checkout
       - run:
-          name: Run Unit Tests
+          name: Calculate cache key
+          command: |-
+            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
+                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+      - restore_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+      - run:
           command: ./gradlew check
       - store_test_results:
           path: build/test-results
+      - save_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          paths:
+            - ~/.gradle/caches
+      - store_artifacts:
+          path: build/reports
 
   benchmark-linux:
     parameters:
@@ -82,4 +94,4 @@ workflows:
           name: Benchmark - Windows (JDK << matrix.java-version >>)
           matrix:
             parameters:
-              java-version: ["17"]
+              java-version: ["17", "21"]
